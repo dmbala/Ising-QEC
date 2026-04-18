@@ -1,102 +1,86 @@
-# NVIDIA Ising
+# Ising-QEC
 
-**Open models, tools, and cookbooks for quantum computing — from device calibration to error correction.**
+Real-time QEC decoding experiments on top of [NVIDIA/Ising-Decoding](https://github.com/NVIDIA/Ising-Decoding), targeting d=5 surface-code decoding with biased (Z:X = 10:1) noise on Harvard Cannon H100/H200 hardware.
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![Hugging Face](https://img.shields.io/badge/HuggingFace-Models-FFD21E?logo=huggingface)](https://huggingface.co/collections/nvidia/nvidia-ising)
+## What this adds to upstream
 
-> This repository is the central landing page for the NVIDIA Ising family of quantum computing tools, models, and cookbooks. For code, see the repositories below.
+- **Singularity container** (`env/ising.def` → `env/ising.sif`) built from the upstream CUDA-12.1 Dockerfile, pinned at torch 2.10+cu128, stim 1.15, pymatching 2.3, tensorrt 10.16.
+- **d=5 biased-noise config** (`conf/config_ising_qec_d5_biased.yaml`, symlinked into `Ising-Decoding/conf/`) — drops distance/n_rounds to 5 and rebalances the 25-parameter noise model for Z:X = 10:1 at total p ≈ 6e-3.
+- **SLURM wrappers** for Kempner partitions: `slurm/smoke_eng.sbatch` (env sanity), `slurm/bootstrap_verify_eng.sbatch` (1-epoch pretrained-weight load check), `slurm/train_dev.sbatch` (50-epoch fine-tune), `slurm/pytest_eng.sbatch` (upstream test suite).
+- **Pretrained-weight seed path**: on the first run, `train_dev.sbatch` copies `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Fast.pt` into `outputs/outputs/<EXP>/models/PreDecoderModelMemory_v1.0.0.pt` so upstream's `load_checkpoint` picks it up as the initialization.
 
----
+## Layout
 
-## Table of Contents
+```
+Ising-QEC/
+├── env/                 ising.def + built ising.sif + build.log
+├── conf/                local Hydra configs (symlinked into Ising-Decoding/conf/)
+├── slurm/               sbatch scripts for smoke/bootstrap/train/pytest
+├── logs/                SLURM stdout/stderr
+├── outputs/             training outputs (nested: outputs/outputs/<EXP>/)
+├── Ising-Decoding/      clone of NVIDIA/Ising-Decoding (Git LFS weights)
+├── notes.md             original project notes (has known errors — see /n/home07/bdesinghu/.claude/plans/...md)
+└── README.md
+```
 
-- [Models](#models)
-- [NIMs](#nims)
-- [Model API Endpoints](#model-api-endpoint)
-- [Datasets](#datasets)
-- [Repositories](#repositories)
-- [Cookbooks](#cookbooks)
-- [Issues & Support](#issues--support)
-- [License](#license)
+## Prerequisites
 
----
+- FAS-RC Cannon account with `kempner_dev` / `kempner_eng` access.
+- `singularity-ce` 4.x on submit host.
+- `git-lfs` installed (needed to pull the `.pt` weights).
+- `~/.bashrc` provides `SINGULARITY_CACHEDIR` and `SINGULARITY_TMPDIR` under netscratch.
 
-## Models
+## First-time setup
 
-The Ising model family is available on Hugging Face:
+```bash
+cd /n/netscratch/kempner_dev/Lab/bdesinghu/Agent/Ising-QEC
 
-| Model | Description | Link |
-|-------|-------------|------|
-| **Ising-Calibration-1-35B-A3B** | Vision-language model for quantum device calibration | [HuggingFace](https://huggingface.co/nvidia/Ising-Calibration-1-35B-A3B) |
-| **Ising-Decoder-SurfaceCode-1-Accurate** | AI predecoder for surface code quantum error correction (1.79M params) | [HuggingFace](https://huggingface.co/nvidia/Ising-Decoder-SurfaceCode-1-Accurate) |
-| **Ising-Decoder-SurfaceCode-1-Fast** | AI predecoder for surface code quantum error correction (0.91M params) | [HuggingFace](https://huggingface.co/nvidia/Ising-Decoder-SurfaceCode-1-Fast) |
+# Container (one-shot, ~15-20 min on netscratch).
+singularity build --fakeroot env/ising.sif env/ising.def
+```
 
-Browse the full collection: [NVIDIA Ising Collection on Hugging Face](https://huggingface.co/collections/nvidia/nvidia-ising)
+Weights and the upstream repo are already on disk under `Ising-Decoding/`.
 
----
-## NIMs
+## Running
 
-| NIM | Description |
-|------------|-------------|
-| [**Ising-Calibration-1-35B-A3B**](https://catalog.ngc.nvidia.com/orgs/nim/teams/nvidia/containers/ising-calibration-1-35b-a3b) | Ready to deploy NIM for Ising-Calibration-1 |
+All sbatch scripts assume you `cd` into the repo root first.
 
----
+```bash
+# 1. Sanity: imports + upstream smoke train (kempner_eng, ~5 min).
+sbatch slurm/smoke_eng.sbatch
 
-## Model API Endpoint
+# 2. Verify the Fast-weight bootstrap drops loss from 0.69 → 0.045 in 1 epoch (kempner_eng, ~5 min).
+sbatch slurm/bootstrap_verify_eng.sbatch
 
-| API | Description |
-|------------|-------------|
-| [**Ising-Calibration-1-35B-A3B**](https://build.nvidia.com/nvidia/ising-calibration-1-35b-a3b) | Build.nvidia.com for Ising-Calibration-1 API endpoint |
+# 3. Full 50-epoch biased fine-tune (kempner_dev, H100/H200; override EPOCHS / FRESH_START via --export).
+sbatch slurm/train_dev.sbatch
 
+# 4. Upstream pytest inside our container (optional, kempner_eng).
+sbatch slurm/pytest_eng.sbatch
+```
 
-## Datasets
+Monitor with `squeue -u $USER` and tail `logs/<job>_<id>.out`.
 
-| Dataset | Description | Link |
-|---------|-------------|------|
-| **QCalEval** | Evaluation dataset for quantum calibration agents | [HuggingFace](https://huggingface.co/datasets/nvidia/QCalEval) |
+## Config: biased noise
 
----
+`conf/config_ising_qec_d5_biased.yaml` extends the public surface with 25-parameter depolarizing overrides. Bias is applied to the **bulk** Pauli channels only (idle-during-CNOT, idle-during-SPAM, and the two-qubit CNOT pair distribution); state-prep and measurement errors stay symmetric. Z:X ratio is 10:1; total per-gate error rate is ~6e-3 (at/just below the depolarizing threshold). Adjust the `data.noise_model` block to sweep.
 
-## Repositories
+## Current state
 
-| Repository | Description |
-|------------|-------------|
-| [Ising-Decoding](https://github.com/NVIDIA/Ising-Decoding) | Training Framework for AI Decoding |
-| [Quantum Calibration Agent Blueprint](https://github.com/NVIDIA/Quantum-Calibration-Agent-Blueprint/) | Agentic workflow blueprint for Quantum Comptuer Calibration VLMs |
-| [QCalEval](https://github.com/NVIDIA/QCalEval) | Open benchmark for assessing VLM capabilities on quantum calibration experiment analysis |
+- Container built, smoke + bootstrap verified on 2026-04-18.
+- 50-epoch fine-tune from Fast weights is the current experiment.
+- Outputs land at `outputs/outputs/qec-decoder-d5-biased/` (the doubled `outputs/outputs/` comes from upstream's `cluster_train.sh` appending "outputs" to `$SHARED_OUTPUT_DIR`; cosmetic, not a bug).
 
----
+## Known issues / open items
 
-## Cookbooks
+- Runtime warning `Int8 GEMM failed on cuda:0, permanently falling back to float32 for weight reduction` appears during DEM build. Benign for training; may need attention if we exercise the INT8 path at export time.
+- Validation generator runs at d=9 (upstream receptive-field constraint), test generator targets d=5 — both using the biased noise config. If we want val on d=5 too, need a custom val_generator override.
+- I/O path for the <10 µs real-time target is **not** designed yet; current latency numbers will be compute-only (CUDA graph, batch=1) until we wire a streaming simulator handoff.
+- Noise parameter sweep schedule is ad hoc — pick a reference paper or range before generating many runs.
 
-Practical guides and tutorials organized by repository:
+## Pointers
 
-### [Ising-Decoding](https://github.com/NVIDIA/ising-decoding)
-
-| Guide | Description |
-|-------|-------------|
-|[Ising-Decoder-Tutorial](https://github.com/NVIDIA/Ising-Decoding/blob/main/cookbook/predecoder.ipynb) | Training, Optimized Inference, Quantizing an AI Pre-decoder |
-|[Quantum Calibration Agent Documentation](https://github.com/NVIDIA/Quantum-Calibration-Agent-Blueprint/tree/main/docs) | Documentation to get started with an agentic workflow for quantum computer calibration |
----
-
-## Issues & Support
-
-This repository is the central place to file issues across the NVIDIA Ising family:
-
-- **Bug reports** — [Open an issue](https://github.com/NVIDIA/ising/issues/new?template=bug.yml)
-- **Feature requests** — [Open an issue](https://github.com/NVIDIA/ising/issues/new?template=feature.yml)
-- **Questions & Discussion** — [Start a discussion](https://github.com/NVIDIA/ising/discussions)
-
-For security vulnerabilities, do not file a public issue — see [SECURITY.md](SECURITY.md).
-
----
-
-## License
-
-Apache 2.0 — see [LICENSE](LICENSE) for details.
-
----
-
-**Open models, tools, and cookbooks for quantum computing — from device calibration to error correction.**
+- Upstream repo + paper: https://github.com/NVIDIA/Ising-Decoding
+- Fast model (R=9, 0.91M params): `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Fast.pt`
+- Accurate model (R=13, 1.79M params): `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Accurate.pt`
+- Plan file (full review of `notes.md` + revised step-by-step): `/n/home07/bdesinghu/.claude/plans/go-through-the-notes-md-swirling-robin.md`

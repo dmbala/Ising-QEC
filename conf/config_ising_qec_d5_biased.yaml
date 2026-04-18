@@ -1,0 +1,56 @@
+# Custom d=5 biased-noise config for the Ising-QEC project.
+#
+# Base: config_qec_decoder_r9_fp8.yaml from NVIDIA/Ising-Decoding.
+# Differences:
+#   - distance / n_rounds reduced to 5 (user-specified target distance).
+#   - noise_model rebalanced for Z:X = 10:1 bias with p_total ≈ 6e-3
+#     (at/just below the depolarizing threshold ~7.5e-3 used for training upscale).
+#
+# NOTE: the upstream training datapipe uses the R=9 receptive field regardless of
+# `distance`; `distance` controls evaluation / sampling only. We pin model_id=1
+# (Fast / R=9) and evaluate on d=5.
+
+model_id: 1
+
+distance: 5
+n_rounds: 5
+
+workflow:
+  task: train
+
+data:
+  code_rotation: O1
+  noise_model:
+    # --- SPAM (keep symmetric; biased noise is a bulk property) ---
+    p_prep_X: 0.004
+    p_prep_Z: 0.004
+    p_meas_X: 0.004
+    p_meas_Z: 0.004
+
+    # --- Idle during CNOT layers: Z:Y:X = 10:1:1, total ≈ 6e-3 ---
+    p_idle_cnot_X: 0.0005
+    p_idle_cnot_Y: 0.0005
+    p_idle_cnot_Z: 0.0050
+
+    # --- Idle during SPAM window on data qubits: same 10:1 Z:X bias ---
+    p_idle_spam_X: 0.000995
+    p_idle_spam_Y: 0.000995
+    p_idle_spam_Z: 0.009950
+
+    # --- CNOT two-qubit Pauli pairs: concentrate weight on Z-containing terms ---
+    # Total across 15 terms ≈ 6e-3. ZZ/ZI/IZ carry ~70% of the mass.
+    p_cnot_IX: 0.00010
+    p_cnot_IY: 0.00010
+    p_cnot_IZ: 0.00100
+    p_cnot_XI: 0.00010
+    p_cnot_XX: 0.00010
+    p_cnot_XY: 0.00010
+    p_cnot_XZ: 0.00030
+    p_cnot_YI: 0.00010
+    p_cnot_YX: 0.00010
+    p_cnot_YY: 0.00010
+    p_cnot_YZ: 0.00030
+    p_cnot_ZI: 0.00100
+    p_cnot_ZX: 0.00030
+    p_cnot_ZY: 0.00030
+    p_cnot_ZZ: 0.00200

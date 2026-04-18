@@ -1,0 +1,55 @@
+Bootstrap: docker
+From: nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+
+%labels
+    org.opencontainers.image.title "Ising-QEC Singularity image"
+    org.opencontainers.image.source "https://github.com/NVIDIA/Ising-Decoding"
+    python_version "3.11"
+    torch_cuda "cu121"
+
+%files
+    /n/netscratch/kempner_dev/Lab/bdesinghu/Agent/Ising-QEC/Ising-Decoding/code/requirements_public_inference.txt   /opt/reqs/requirements_public_inference.txt
+    /n/netscratch/kempner_dev/Lab/bdesinghu/Agent/Ising-QEC/Ising-Decoding/code/requirements_public_train-cu12.txt  /opt/reqs/requirements_public_train-cu12.txt
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export PYTHONUNBUFFERED=1
+
+    apt-get update -qq
+    apt-get install -y -qq --no-install-recommends \
+        python3.11 python3.11-venv python3.11-dev \
+        curl git git-lfs coreutils build-essential cmake ca-certificates
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+    python3.11 -m venv /opt/venv
+    . /opt/venv/bin/activate
+
+    ls -la /opt/reqs/
+    pip install --no-cache-dir --upgrade pip setuptools wheel
+    pip install --no-cache-dir \
+        -r /opt/reqs/requirements_public_train-cu12.txt \
+        --index-url https://download.pytorch.org/whl/cu121 \
+        --extra-index-url https://pypi.org/simple
+
+    # FP8 TensorRT export path (workflows 2 and 3 in Ising-Decoding).
+    pip install --no-cache-dir tensorrt
+    # Optional zero-copy GPU transfers for the cuStabilizer path.
+    pip install --no-cache-dir cupy-cuda12x || true
+
+    python -c "import torch, stim, pymatching, tensorrt; \
+        print('torch', torch.__version__, 'cuda', torch.version.cuda); \
+        print('stim', stim.__version__); \
+        print('pymatching', pymatching.__version__); \
+        print('tensorrt', tensorrt.__version__)"
+
+%environment
+    export PATH=/opt/venv/bin:$PATH
+    export PYTHONUNBUFFERED=1
+    export PREDECODER_PYTHON=/opt/venv/bin/python
+    export HDF5_USE_FILE_LOCKING=FALSE
+    export CUDNN_V8_API_ENABLED=1
+
+%runscript
+    exec "$@"
