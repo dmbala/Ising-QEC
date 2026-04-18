@@ -78,9 +78,6 @@ Monitor with `squeue -u $USER` and tail `logs/<job>_<id>.out`.
 - I/O path for the <10 µs real-time target is **not** designed yet; current latency numbers will be compute-only (CUDA graph, batch=1) until we wire a streaming simulator handoff.
 - Noise parameter sweep schedule is ad hoc — pick a reference paper or range before generating many runs.
 
-## Pointers
+## Reference
 
-- Upstream repo + paper: https://github.com/NVIDIA/Ising-Decoding
-- Fast model (R=9, 0.91M params): `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Fast.pt`
-- Accurate model (R=13, 1.79M params): `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Accurate.pt`
-- Plan file (full review of `notes.md` + revised step-by-step): `/n/home07/bdesinghu/.claude/plans/go-through-the-notes-md-swirling-robin.md`
+- Repo + paper: https://github.com/NVIDIA/Ising-Decoding
