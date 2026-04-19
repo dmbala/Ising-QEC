@@ -42,6 +42,11 @@ echo "[train] node=$(hostname)"
 echo "[train] experiment=$EXPERIMENT_NAME config=$CONFIG_NAME fresh=$FRESH_START epochs=$EPOCHS samples=${PREDECODER_TRAIN_SAMPLES:-default}"
 nvidia-smi -L
 
+optional_env_args=()
+if [ -n "${PREDECODER_TRAIN_SAMPLES:-}" ]; then
+    optional_env_args+=(--env "PREDECODER_TRAIN_SAMPLES=${PREDECODER_TRAIN_SAMPLES}")
+fi
+
 singularity exec --nv \
     --bind "${ISING_DIR}:${ISING_DIR}" \
     --bind "${SHARED_OUTPUT_DIR}:${SHARED_OUTPUT_DIR}" \
@@ -56,7 +61,7 @@ singularity exec --nv \
     --env PREDECODER_TORCH_COMPILE=0 \
     --env PREDECODER_VERBOSE=1 \
     --env PREDECODER_LER_FINAL_ONLY=1 \
-    ${PREDECODER_TRAIN_SAMPLES:+--env PREDECODER_TRAIN_SAMPLES="${PREDECODER_TRAIN_SAMPLES}"} \
+    "${optional_env_args[@]}" \
     "$SIF" bash "${ISING_DIR}/code/scripts/cluster_train.sh"
 
 echo "[train] done"
