@@ -112,4 +112,4 @@ Full list with reproduction steps is in `SUMMARY.md`. Short version:
 - Paper: https://research.nvidia.com/publication/2026-04_fast-ai-based-pre-decoders-surface-codes
 - Fast model (R=9, 0.91M): `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Fast.pt`
 - Accurate model (R=13, 1.79M): `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Accurate.pt`
-- Plan file: `~/.claude/plans/go-through-the-notes-md-swirling-robin.md`
+- Plan summary: see `notes.md`
