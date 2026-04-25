@@ -1,0 +1,50 @@
+# d=5 structured-shift proxy used to emulate hotspot-like behavior.
+#
+# The public NVIDIA Ising config surface does not expose site-local crosstalk or
+# detector-specific hotspots. This proxy increases measurement and CNOT noise in
+# a globally visible but structurally similar way so we can stress-test
+# specialization without modifying upstream datagen internals.
+
+model_id: 1
+
+distance: 5
+n_rounds: 5
+
+workflow:
+  task: train
+
+data:
+  code_rotation: O1
+  noise_model:
+    # --- SPAM with meas-heavy stress ---
+    p_prep_X: 0.004
+    p_prep_Z: 0.004
+    p_meas_X: 0.006
+    p_meas_Z: 0.009
+
+    # --- Idle during CNOT layers: same bias as the base 10:1 point ---
+    p_idle_cnot_X: 0.0005
+    p_idle_cnot_Y: 0.0005
+    p_idle_cnot_Z: 0.0050
+
+    # --- Idle during SPAM window: slightly elevated versus the base config ---
+    p_idle_spam_X: 0.0012
+    p_idle_spam_Y: 0.0012
+    p_idle_spam_Z: 0.0108
+
+    # --- CNOT pairs: more mass on Z-containing terms, total ~= 8e-3 ---
+    p_cnot_IX: 0.00015
+    p_cnot_IY: 0.00015
+    p_cnot_IZ: 0.00125
+    p_cnot_XI: 0.00015
+    p_cnot_XX: 0.00015
+    p_cnot_XY: 0.00015
+    p_cnot_XZ: 0.00045
+    p_cnot_YI: 0.00015
+    p_cnot_YX: 0.00015
+    p_cnot_YY: 0.00015
+    p_cnot_YZ: 0.00045
+    p_cnot_ZI: 0.00125
+    p_cnot_ZX: 0.00045
+    p_cnot_ZY: 0.00045
+    p_cnot_ZZ: 0.00250

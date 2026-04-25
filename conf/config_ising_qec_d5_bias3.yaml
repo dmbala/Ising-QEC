@@ -1,0 +1,50 @@
+# d=5 evaluation/training config with a milder Z:X = 3:1 bias.
+#
+# Same public-release constraints as the main biased config:
+# - model_id=1 (Fast / R=9)
+# - distance / n_rounds affect evaluation sampling
+# - training still uses the upstream 9x9x9 receptive field
+
+model_id: 1
+
+distance: 5
+n_rounds: 5
+
+workflow:
+  task: train
+
+data:
+  code_rotation: O1
+  noise_model:
+    # --- SPAM (kept symmetric) ---
+    p_prep_X: 0.004
+    p_prep_Z: 0.004
+    p_meas_X: 0.004
+    p_meas_Z: 0.004
+
+    # --- Idle during CNOT layers: Z:Y:X = 3:1:1, total = 6e-3 ---
+    p_idle_cnot_X: 0.0015
+    p_idle_cnot_Y: 0.0015
+    p_idle_cnot_Z: 0.0030
+
+    # --- Idle during SPAM window: same 3:1 Z:X bias, total ~= 1.194e-2 ---
+    p_idle_spam_X: 0.002388
+    p_idle_spam_Y: 0.002388
+    p_idle_spam_Z: 0.007164
+
+    # --- CNOT two-qubit Pauli pairs, still Z-weighted but less sharply than 10:1 ---
+    p_cnot_IX: 0.00020
+    p_cnot_IY: 0.00020
+    p_cnot_IZ: 0.00070
+    p_cnot_XI: 0.00020
+    p_cnot_XX: 0.00020
+    p_cnot_XY: 0.00020
+    p_cnot_XZ: 0.00035
+    p_cnot_YI: 0.00020
+    p_cnot_YX: 0.00020
+    p_cnot_YY: 0.00020
+    p_cnot_YZ: 0.00035
+    p_cnot_ZI: 0.00070
+    p_cnot_ZX: 0.00035
+    p_cnot_ZY: 0.00035
+    p_cnot_ZZ: 0.00160

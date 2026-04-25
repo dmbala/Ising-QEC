@@ -15,10 +15,11 @@ See `SUMMARY.md` for the numbers table and `notes.md` for the original plan.
 ## What this adds to upstream
 
 - **Singularity container** (`env/ising.def` → `env/ising.sif`): torch 2.10+cu128, stim 1.15, pymatching 2.3, **tensorrt 10.12 cu12-pinned** (bare `tensorrt` pulls cu13 libs that segfault on some kempner_eng nodes).
-- **d=5 biased-noise config** (`conf/config_ising_qec_d5_biased.yaml`, symlinked into `Ising-Decoding/conf/`) — drops distance/n_rounds to 5 and rebalances the 25-parameter noise model for Z:X = 10:1 at total p ≈ 6e-3.
+- **d=5 noise configs** (`conf/config_ising_qec_d5_*.yaml`, symlinked into `Ising-Decoding/conf/`) — the original 10:1 biased point plus `bias3`, `bias30`, `drift`, and `hotspot` stress configs for robustness sweeps.
 - **SLURM wrappers** for kempner_eng (H200): `smoke_eng`, `bootstrap_verify_eng`, `train_eng`, `pytest_eng`, `export_fp8_eng`, `latency_eng`, `latency_trt_eng`, `roundtrip_eng`.
 - **Pretrained-weight seed path**: `train_eng.sbatch` copies `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Fast.pt` into `outputs/outputs/<EXP>/models/PreDecoderModelMemory_v1.0.0.pt` so upstream's `load_checkpoint` picks it up as the initialization.
 - **Benchmark tools**: `bench/latency.py` (PyTorch forward), `bench/latency_trt.py` (TRT engine), `bench/roundtrip.py` (host ↔ device round-trip as one captured CUDA graph).
+- **Robustness + hybrid-decoder tooling**: `bench/eval_ler_matrix.py`, `bench/aggregate_results.py`, `bench/eval_hybrid_gate.py`, plus `slurm/sweep_train_eng.sbatch`, `slurm/sweep_eval_eng.sbatch`, and `slurm/hybrid_eval_eng.sbatch`.
 
 ## Layout
 
@@ -27,9 +28,10 @@ Ising-QEC/
 ├── env/                 ising.def + ising.sif + build.log
 ├── conf/                local Hydra configs (symlinked into Ising-Decoding/conf/)
 ├── slurm/               sbatch scripts (all on kempner_eng)
-├── bench/               latency + round-trip benchmarks
+├── bench/               latency + round-trip + robustness analysis tools
 ├── logs/                SLURM stdout/stderr
 ├── outputs/             training outputs (nested: outputs/outputs/<EXP>/)
+├── results/             matrix / hybrid-analysis outputs (gitignored)
 ├── Ising-Decoding/      clone of NVIDIA/Ising-Decoding (Git LFS weights)
 ├── notes.md             original project notes (has known errors — see the plan file in ~/.claude/plans/)
 ├── README.md
@@ -91,9 +93,38 @@ sbatch slurm/roundtrip_eng.sbatch
 
 Monitor with `squeue -u $USER` and tail `logs/<job>_<id>.out`.
 
+## Robustness sweeps
+
+The repo now includes a minimal train-vs-test matrix workflow for noise-shift experiments and a residual-weight-gated hybrid-decoder analysis path.
+
+Submit one training job per config:
+
+```bash
+sbatch slurm/sweep_train_eng.sbatch
+```
+
+Run a full train-experiment vs eval-config matrix and aggregate the summaries:
+
+```bash
+sbatch slurm/sweep_eval_eng.sbatch
+```
+
+Run decoder ablations on one trained checkpoint and estimate simple residual-weight-gated policies such as:
+- use `No-op` or `Union-Find` on very light residuals
+- fall back to `Corr-PM` on heavier residuals
+
+```bash
+sbatch --export=ALL,EXPERIMENT_NAME=qec-decoder-d5-biased,CONFIG_NAME=config_ising_qec_d5_biased \
+  slurm/hybrid_eval_eng.sbatch
+```
+
+Outputs land under `results/matrix/<run>/` and `results/hybrid/<experiment>__<config>/`.
+
 ## Config: biased noise
 
 `conf/config_ising_qec_d5_biased.yaml` extends the public surface with 25-parameter depolarizing overrides. Bias is applied to the **bulk** Pauli channels only (idle-during-CNOT, idle-during-SPAM, and the two-qubit CNOT pair distribution); state-prep and measurement errors stay symmetric. Z:X ratio is 10:1; total per-gate error rate is ~6e-3 (just below the depolarizing threshold). Adjust the `data.noise_model` block to sweep.
+
+The added `drift` and `hotspot` configs are intentionally proxies. The public upstream config does not expose time-indexed drift or site-local hotspot knobs, so these files encode global shifted operating points that are still useful for robustness testing without changing upstream datagen internals.
 
 ## Gotchas
 
