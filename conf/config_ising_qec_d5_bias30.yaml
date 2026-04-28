@@ -1,0 +1,45 @@
+# d=5 evaluation/training config with a stronger Z:X = 30:1 bias.
+
+model_id: 1
+
+distance: 5
+n_rounds: 5
+
+workflow:
+  task: train
+
+data:
+  code_rotation: O1
+  noise_model:
+    # --- SPAM (kept symmetric) ---
+    p_prep_X: 0.004
+    p_prep_Z: 0.004
+    p_meas_X: 0.004
+    p_meas_Z: 0.004
+
+    # --- Idle during CNOT layers: Z:Y:X = 30:1:1, total = 6e-3 ---
+    p_idle_cnot_X: 0.0001875
+    p_idle_cnot_Y: 0.0001875
+    p_idle_cnot_Z: 0.0056250
+
+    # --- Idle during SPAM window: same 30:1 Z:X bias, total ~= 1.194e-2 ---
+    p_idle_spam_X: 0.000373
+    p_idle_spam_Y: 0.000373
+    p_idle_spam_Z: 0.011194
+
+    # --- CNOT two-qubit Pauli pairs with a very strong concentration on Z-containing terms ---
+    p_cnot_IX: 0.000025
+    p_cnot_IY: 0.000025
+    p_cnot_IZ: 0.000950
+    p_cnot_XI: 0.000025
+    p_cnot_XX: 0.000025
+    p_cnot_XY: 0.000025
+    p_cnot_XZ: 0.000150
+    p_cnot_YI: 0.000025
+    p_cnot_YX: 0.000025
+    p_cnot_YY: 0.000025
+    p_cnot_YZ: 0.000150
+    p_cnot_ZI: 0.000950
+    p_cnot_ZX: 0.000150
+    p_cnot_ZY: 0.000150
+    p_cnot_ZZ: 0.003300
