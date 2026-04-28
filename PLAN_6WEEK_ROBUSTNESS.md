@@ -14,6 +14,8 @@ This repo already demonstrates a working NVIDIA Ising deployment for `d=5` surfa
 
 The next research question is not whether the pipeline works, but how robust it is under noise shift and whether a lightweight hybrid policy can improve the latency-vs-LER tradeoff when the trained pre-decoder is evaluated off its training point.
 
+Quantization is part of that question. The plan must explicitly track whether the FP8 TensorRT path loses more accuracy under noise shift than the FP32 PyTorch path, not just whether FP8 is acceptable at the in-distribution baseline.
+
 Two important constraints carry through the whole plan:
 
 - The public NVIDIA Ising config surface only exposes global 25-parameter circuit-level noise settings.
@@ -72,23 +74,31 @@ Tasks:
 sbatch slurm/sweep_train_eng.sbatch
 ```
 
-- Run matrix evaluation across all trained experiments and eval configs:
+- Run matrix evaluation across all trained experiments and eval configs for both inference modes:
+  - `torch` / `ONNX_WORKFLOW=0`
+  - `fp8` / `ONNX_WORKFLOW=2, QUANT_FORMAT=fp8`
 
 ```bash
 sbatch slurm/sweep_eval_eng.sbatch
 ```
 
-- Aggregate results using the generated `summary.csv`, `summary.jsonl`, and `aggregate.md`.
+- Aggregate results using the generated per-mode files and quantization comparison outputs:
+  - `torch/json/summary.csv`
+  - `fp8/json/summary.csv`
+  - `quantization_gap.csv`
+  - `quantization_gap.md`
 
 Deliverables:
 
 - one complete train-experiment vs eval-config matrix under `results/matrix/<run>/`
 - aggregated CSV and Markdown summary for quick inspection
+- one explicit torch-vs-FP8 robustness-gap summary
 
 Acceptance criteria:
 
 - each trained experiment has at least one successful inference result on every eval config
 - no missing rows in the matrix for the chosen experiment/config set
+- both torch and FP8 results are available for the same train/eval pairs
 
 ### Week 3: Robustness and generalization analysis
 
@@ -104,17 +114,20 @@ Tasks:
   - proxy hotspot
 - Identify whether any single trained model generalizes better than the rest.
 - Flag whether latency after pre-decoding remains stable even when LER degrades.
+- Quantify whether FP8 degrades more than FP32 on off-diagonal evaluations and rank the worst quantization-induced robustness gaps.
 
 Deliverables:
 
 - one short analysis note or table ranking cross-noise robustness
 - one heatmap-ready CSV derived from the matrix output
+- one quantization-gap table highlighting `FP8 LER - FP32 LER` per eval config
 - one summary statement answering: “Does specialization transfer, and where does it fail?”
 
 Acceptance criteria:
 
 - a preferred “robust default” training point is selected
 - at least one concrete failure mode is identified from off-diagonal results
+- the plan identifies whether FP8 remains acceptable under the important shifted-noise cases
 
 ### Week 4: Residual-weight-gated hybrid evaluation
 
@@ -156,13 +169,16 @@ Tasks:
   - hybrid gate estimates
 - Compare these operating modes:
   - PyMatching alone
-  - predecoder + Corr-PM
-  - gated hybrid policy
+  - FP32 predecoder + Corr-PM
+  - FP8 predecoder + Corr-PM
+  - gated hybrid policy built on the preferred predecoder path
 - Choose one primary threshold/policy for the paper story based on the best latency-vs-LER balance.
+- Treat quantization robustness penalty as an explicit decision variable, not just an implementation detail.
 
 Deliverables:
 
 - one Pareto-style comparison table
+- one FP32-vs-FP8 robustness penalty summary used in the recommendation
 - one recommended operating policy for later paper figures
 - one sentence-level claim for the paper draft, for example:
   - robustness degrades under shift, but a simple hybrid gate recovers much of the loss
@@ -171,6 +187,7 @@ Acceptance criteria:
 
 - one operating point is chosen and justified
 - the decision is based on measured or derived metrics already present in repo outputs
+- the recommendation explicitly states whether FP8 is retained or dropped for shifted-noise experiments
 
 ### Week 6: Paper figures, tables, and writing package
 
@@ -209,11 +226,14 @@ By the end of the 6 weeks, the repo should contain or be able to regenerate:
 
 - trained checkpoints for the selected noise configs under `outputs/outputs/<experiment>/`
 - matrix results under `results/matrix/<run>/`
+- per-mode matrix summaries under `results/matrix/<run>/torch/` and `results/matrix/<run>/fp8/`
 - hybrid results under `results/hybrid/<experiment>__<config>/`
 - aggregated tables:
   - `summary.csv`
   - `aggregate.csv`
   - `aggregate.md`
+  - `quantization_gap.csv`
+  - `quantization_gap.md`
   - `hybrid_policies.json`
   - `hybrid_policies.md`
 - a paper-ready bundle of figures and tables derived from those files
@@ -236,6 +256,7 @@ Success criteria for the phase:
 - Baseline numbers remain reproducible.
 - Matrix runs complete cleanly for the selected config set.
 - A robustness story is visible in the off-diagonal results.
+- The quantization robustness penalty is measured rather than assumed.
 - A simple gated hybrid policy is identified and justified.
 - The repo contains enough artifacts to support a short paper draft.
 
@@ -245,6 +266,7 @@ Risks:
 
 - `PREDECODER_LER_FINAL_ONLY=1` remains necessary because per-epoch LER validation is still unstable.
 - FP8 calibration may still leave a small accuracy gap versus FP32.
+- FP8 may also amplify off-distribution degradation, which is why the matrix must be run in both torch and FP8 modes.
 - Validation remains tied to upstream public datagen behavior, including the Fast model’s fixed receptive field.
 - Drift and hotspot remain proxy configs unless upstream datagen is extended.
 
@@ -253,6 +275,7 @@ Assumptions:
 - All jobs continue to run on `kempner_eng` H200 nodes.
 - The current Fast-model (`model_id=1`) path stays the primary baseline.
 - Existing sweep and hybrid scripts remain the control surface for the research phase.
+- `slurm/sweep_eval_eng.sbatch` is the canonical way to produce matched torch-vs-FP8 robustness outputs.
 
 What not to change during this plan unless there is a compelling reason:
 

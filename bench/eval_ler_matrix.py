@@ -28,6 +28,7 @@ DEFAULT_CONFIGS = (
 CSV_FIELDS = [
     "train_experiment",
     "eval_config",
+    "eval_mode",
     "status",
     "returncode",
     "wall_seconds",
@@ -152,6 +153,7 @@ def run_case(
     latency_samples: int,
     onnx_workflow: int,
     quant_format: str,
+    mode_label: str,
     dry_run: bool,
 ) -> dict[str, object]:
     raw_dir = results_root / "raw"
@@ -159,7 +161,7 @@ def run_case(
     raw_dir.mkdir(parents=True, exist_ok=True)
     json_dir.mkdir(parents=True, exist_ok=True)
 
-    tag = f"{case.train_experiment}__{case.eval_config}"
+    tag = f"{case.train_experiment}__{case.eval_config}__{mode_label}"
     log_path = raw_dir / f"{tag}.log"
     summary_path = json_dir / f"{tag}.json"
 
@@ -207,6 +209,7 @@ def run_case(
     record: dict[str, object] = {
         "train_experiment": case.train_experiment,
         "eval_config": case.eval_config,
+        "eval_mode": mode_label,
         "samples": samples,
         "onnx_workflow": onnx_workflow,
         "quant_format": quant_format or "",
@@ -275,6 +278,7 @@ def main() -> int:
     parser.add_argument("--latency-samples", type=int, default=0)
     parser.add_argument("--onnx-workflow", type=int, default=0)
     parser.add_argument("--quant-format", default="")
+    parser.add_argument("--mode-label", default="")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -289,6 +293,11 @@ def main() -> int:
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         results_root = repo_root / "results" / "matrix" / stamp
     results_root.mkdir(parents=True, exist_ok=True)
+
+    mode_label = args.mode_label.strip()
+    if not mode_label:
+        quant_suffix = args.quant_format.strip().lower() or "default"
+        mode_label = f"workflow{args.onnx_workflow}-{quant_suffix}"
 
     if args.manifest:
         cases = read_manifest(Path(args.manifest).resolve())
@@ -318,6 +327,7 @@ def main() -> int:
             latency_samples=args.latency_samples,
             onnx_workflow=args.onnx_workflow,
             quant_format=args.quant_format,
+            mode_label=mode_label,
             dry_run=args.dry_run,
         )
         rows.append(row)

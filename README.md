@@ -19,7 +19,7 @@ See `SUMMARY.md` for the numbers table, `PLAN_6WEEK_ROBUSTNESS.md` for the canon
 - **SLURM wrappers** for kempner_eng (H200): `smoke_eng`, `bootstrap_verify_eng`, `train_eng`, `pytest_eng`, `export_fp8_eng`, `latency_eng`, `latency_trt_eng`, `roundtrip_eng`.
 - **Pretrained-weight seed path**: `train_eng.sbatch` copies `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Fast.pt` into `outputs/outputs/<EXP>/models/PreDecoderModelMemory_v1.0.0.pt` so upstream's `load_checkpoint` picks it up as the initialization.
 - **Benchmark tools**: `bench/latency.py` (PyTorch forward), `bench/latency_trt.py` (TRT engine), `bench/roundtrip.py` (host ↔ device round-trip as one captured CUDA graph).
-- **Robustness + hybrid-decoder tooling**: `bench/eval_ler_matrix.py`, `bench/aggregate_results.py`, `bench/eval_hybrid_gate.py`, plus `slurm/sweep_train_eng.sbatch`, `slurm/sweep_eval_eng.sbatch`, and `slurm/hybrid_eval_eng.sbatch`.
+- **Robustness + hybrid-decoder tooling**: `bench/eval_ler_matrix.py`, `bench/aggregate_results.py`, `bench/compare_quant_modes.py`, `bench/eval_hybrid_gate.py`, plus `slurm/sweep_train_eng.sbatch`, `slurm/sweep_eval_eng.sbatch`, and `slurm/hybrid_eval_eng.sbatch`.
 
 ## Layout
 
@@ -104,10 +104,18 @@ Submit one training job per config:
 sbatch slurm/sweep_train_eng.sbatch
 ```
 
-Run a full train-experiment vs eval-config matrix and aggregate the summaries:
+Run a full train-experiment vs eval-config matrix and aggregate the summaries. By default this now evaluates both:
+- `torch` (`ONNX_WORKFLOW=0`)
+- `fp8` (`ONNX_WORKFLOW=2`, `QUANT_FORMAT=fp8`)
 
 ```bash
 sbatch slurm/sweep_eval_eng.sbatch
+```
+
+Override `EVAL_MODES` if you only want one path, for example:
+
+```bash
+sbatch --export=ALL,EVAL_MODES=torch slurm/sweep_eval_eng.sbatch
 ```
 
 Run decoder ablations on one trained checkpoint and estimate simple residual-weight-gated policies such as:
@@ -119,7 +127,7 @@ sbatch --export=ALL,EXPERIMENT_NAME=qec-decoder-d5-biased,CONFIG_NAME=config_isi
   slurm/hybrid_eval_eng.sbatch
 ```
 
-Outputs land under `results/matrix/<run>/` and `results/hybrid/<experiment>__<config>/`.
+Outputs land under `results/matrix/<run>/torch/`, `results/matrix/<run>/fp8/`, a top-level `quantization_gap.{csv,md}` comparison, and `results/hybrid/<experiment>__<config>/`.
 
 ## Config: biased noise
 

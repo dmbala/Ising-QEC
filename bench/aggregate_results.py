@@ -12,6 +12,7 @@ from pathlib import Path
 FIELDS = [
     "train_experiment",
     "eval_config",
+    "eval_mode",
     "status",
     "avg_ler_baseline",
     "avg_ler_after",
