@@ -10,7 +10,7 @@ fine-tune LER (Avg X/Z)   0.0338 (FP32)   0.0355 (FP8 TRT)
 PyMatching speedup with neural pre-decoder: 1.60×
 ```
 
-See `SUMMARY.md` for the numbers table and `notes.md` for the original plan.
+See `SUMMARY.md` for the numbers table, `PLAN_6WEEK_ROBUSTNESS.md` for the canonical next-phase roadmap, and `notes.md` for the original scratch plan.
 
 ## What this adds to upstream
 
@@ -33,7 +33,8 @@ Ising-QEC/
 ├── outputs/             training outputs (nested: outputs/outputs/<EXP>/)
 ├── results/             matrix / hybrid-analysis outputs (gitignored)
 ├── Ising-Decoding/      clone of NVIDIA/Ising-Decoding (Git LFS weights)
-├── notes.md             original project notes (has known errors — see the plan file in ~/.claude/plans/)
+├── PLAN_6WEEK_ROBUSTNESS.md  canonical 6-week robustness roadmap
+├── notes.md             original project notes / scratch plan with outdated assumptions
 ├── README.md
 └── SUMMARY.md           metrics + artifacts + gotchas for later review
 ```
@@ -143,4 +144,4 @@ Full list with reproduction steps is in `SUMMARY.md`. Short version:
 - Paper: https://research.nvidia.com/publication/2026-04_fast-ai-based-pre-decoders-surface-codes
 - Fast model (R=9, 0.91M): `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Fast.pt`
 - Accurate model (R=13, 1.79M): `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Accurate.pt`
-- Plan summary: see `notes.md`
+- Current roadmap: see `PLAN_6WEEK_ROBUSTNESS.md`
