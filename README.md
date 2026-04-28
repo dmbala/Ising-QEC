@@ -10,7 +10,7 @@ fine-tune LER (Avg X/Z)   0.0338 (FP32)   0.0355 (FP8 TRT)
 PyMatching speedup with neural pre-decoder: 1.60×
 ```
 
-See `SUMMARY.md` for the numbers table, `PLAN_6WEEK_ROBUSTNESS.md` for the canonical next-phase roadmap, and `notes.md` for the original scratch plan.
+See `SUMMARY.md` for the numbers table, `PLAN_6WEEK_ROBUSTNESS.md` for the canonical next-phase roadmap, `regime_router/ROADMAP.md` and `regime_router/EXECUTION_PLAN.md` for the regime-routing subsystem plan, and `notes.md` for the original scratch plan.
 
 ## What this adds to upstream
 
@@ -20,6 +20,7 @@ See `SUMMARY.md` for the numbers table, `PLAN_6WEEK_ROBUSTNESS.md` for the canon
 - **Pretrained-weight seed path**: `train_eng.sbatch` copies `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Fast.pt` into `outputs/outputs/<EXP>/models/PreDecoderModelMemory_v1.0.0.pt` so upstream's `load_checkpoint` picks it up as the initialization.
 - **Benchmark tools**: `bench/latency.py` (PyTorch forward), `bench/latency_trt.py` (TRT engine), `bench/roundtrip.py` (host ↔ device round-trip as one captured CUDA graph).
 - **Robustness + hybrid-decoder tooling**: `bench/eval_ler_matrix.py`, `bench/aggregate_results.py`, `bench/compare_quant_modes.py`, `bench/eval_hybrid_gate.py`, plus `slurm/sweep_train_eng.sbatch`, `slurm/sweep_eval_eng.sbatch`, and `slurm/hybrid_eval_eng.sbatch`.
+- **Regime-routing subsystem**: `regime_router/` package, router configs in `conf/regime_*.yaml`, CLI entrypoints in `bench/`, and CPU-side SLURM helpers for dataset build / classifier train / routed evaluation.
 
 ## Layout
 
@@ -29,6 +30,7 @@ Ising-QEC/
 ├── conf/                local Hydra configs (symlinked into Ising-Decoding/conf/)
 ├── slurm/               sbatch scripts (all on kempner_eng)
 ├── bench/               latency + round-trip + robustness analysis tools
+├── regime_router/       reusable routing subsystem + local roadmap docs
 ├── logs/                SLURM stdout/stderr
 ├── outputs/             training outputs (nested: outputs/outputs/<EXP>/)
 ├── results/             matrix / hybrid-analysis outputs (gitignored)
@@ -129,6 +131,27 @@ sbatch --export=ALL,EXPERIMENT_NAME=qec-decoder-d5-biased,CONFIG_NAME=config_isi
 
 Outputs land under `results/matrix/<run>/torch/`, `results/matrix/<run>/fp8/`, a top-level `quantization_gap.{csv,md}` comparison, and `results/hybrid/<experiment>__<config>/`.
 
+## Regime routing
+
+The repo now also includes a regime-aware routing scaffold for choosing among multiple fine-tuned experts.
+
+Routing assets live in:
+
+- `conf/regime_catalog.yaml`
+- `conf/regime_router.yaml`
+- `regime_router/`
+
+Thin entrypoints:
+
+```bash
+python3 bench/export_regime_catalog.py
+sbatch slurm/train_router_dataset.sbatch
+sbatch slurm/train_router_model.sbatch
+sbatch --export=ALL,MATRIX_CSV=/path/to/results/matrix/<run>/fp8/json/aggregate.csv slurm/routed_eval_eng.sbatch
+```
+
+This router path is intentionally a proxy architecture today: it trains on config-derived feature windows rather than real hardware calibration streams or single-shot syndrome classification.
+
 ## Config: biased noise
 
 `conf/config_ising_qec_d5_biased.yaml` extends the public surface with 25-parameter depolarizing overrides. Bias is applied to the **bulk** Pauli channels only (idle-during-CNOT, idle-during-SPAM, and the two-qubit CNOT pair distribution); state-prep and measurement errors stay symmetric. Z:X ratio is 10:1; total per-gate error rate is ~6e-3 (just below the depolarizing threshold). Adjust the `data.noise_model` block to sweep.
@@ -153,3 +176,4 @@ Full list with reproduction steps is in `SUMMARY.md`. Short version:
 - Fast model (R=9, 0.91M): `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Fast.pt`
 - Accurate model (R=13, 1.79M): `Ising-Decoding/models/Ising-Decoder-SurfaceCode-1-Accurate.pt`
 - Current roadmap: see `PLAN_6WEEK_ROBUSTNESS.md`
+- Router roadmap: see `regime_router/ROADMAP.md`

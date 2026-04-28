@@ -1,0 +1,40 @@
+schema_version: 1
+default_regime: bias10
+
+regimes:
+  bias3:
+    config_name: config_ising_qec_d5_bias3
+    experiment_name: qec-decoder-d5-bias3
+    description: Mild Z-biased regime used as a weaker-bias specialist.
+    artifacts:
+      checkpoint_glob: outputs/outputs/qec-decoder-d5-bias3/models/best_model/PreDecoderModelMemory_v1.0.*.pt
+      engine_template: results/router/artifacts/engines/qec-decoder-d5-bias3/predecoder_memory_d5_T5_{basis}_fp8.engine
+  bias10:
+    config_name: config_ising_qec_d5_biased
+    experiment_name: qec-decoder-d5-biased
+    description: Default / robust baseline aligned with the current repo summary.
+    default: true
+    artifacts:
+      checkpoint_glob: outputs/outputs/qec-decoder-d5-biased/models/best_model/PreDecoderModelMemory_v1.0.*.pt
+      engine_template: results/router/artifacts/engines/qec-decoder-d5-biased/predecoder_memory_d5_T5_{basis}_fp8.engine
+  bias30:
+    config_name: config_ising_qec_d5_bias30
+    experiment_name: qec-decoder-d5-bias30
+    description: Strong Z-biased regime used as a high-bias specialist.
+    artifacts:
+      checkpoint_glob: outputs/outputs/qec-decoder-d5-bias30/models/best_model/PreDecoderModelMemory_v1.0.*.pt
+      engine_template: results/router/artifacts/engines/qec-decoder-d5-bias30/predecoder_memory_d5_T5_{basis}_fp8.engine
+  drift:
+    config_name: config_ising_qec_d5_drift
+    experiment_name: qec-decoder-d5-drift
+    description: Proxy drift regime representing a nearby but shifted operating point.
+    artifacts:
+      checkpoint_glob: outputs/outputs/qec-decoder-d5-drift/models/best_model/PreDecoderModelMemory_v1.0.*.pt
+      engine_template: results/router/artifacts/engines/qec-decoder-d5-drift/predecoder_memory_d5_T5_{basis}_fp8.engine
+  hotspot:
+    config_name: config_ising_qec_d5_hotspot
+    experiment_name: qec-decoder-d5-hotspot
+    description: Proxy hotspot regime representing structured stress beyond the baseline point.
+    artifacts:
+      checkpoint_glob: outputs/outputs/qec-decoder-d5-hotspot/models/best_model/PreDecoderModelMemory_v1.0.*.pt
+      engine_template: results/router/artifacts/engines/qec-decoder-d5-hotspot/predecoder_memory_d5_T5_{basis}_fp8.engine

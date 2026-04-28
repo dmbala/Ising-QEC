@@ -1,0 +1,27 @@
+schema_version: 1
+catalog_path: conf/regime_catalog.yaml
+default_regime: bias10
+confidence_threshold: 0.70
+
+dataset:
+  feature_source: config_proxy
+  num_windows_per_regime: 512
+  window_size_shots: 2048
+  noise_scale: 0.08
+  seed: 7
+  splits:
+    train: 0.70
+    valid: 0.15
+    test: 0.15
+
+training:
+  model_type: softmax
+  epochs: 400
+  learning_rate: 0.05
+  l2: 0.0001
+  seed: 7
+
+evaluation:
+  split: test
+  fallback_policy: default_regime
+  preferred_matrix_mode: fp8
